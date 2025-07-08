@@ -24,19 +24,47 @@ from PIL import Image
 from tqdm import tqdm
 
 # --- Image conversion ---
-def convert_images_in_folder(folder_path, target_format):
-    target_format = target_format.lower().strip('.')
-    valid_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif', '.webp']
+def convert_images_in_folder(folder_path, user_format_input):
+    # Normalize target format
+    format_map = {
+        "tif": "tiff",
+        "tiff": "tiff",
+        "jpg": "jpeg",
+        "ico": "ico",
+        "jpeg": "jpeg",
+        "png": "png",
+        "bmp": "bmp",
+        "gif": "gif",
+        "webp": "webp"
+    }
 
-    # Get only eligible files
-    files = [f for f in os.listdir(folder_path)
-             if os.path.splitext(f)[1].lower() in valid_extensions and os.path.splitext(f)[1].strip('.').lower() != target_format]
+    target_ext = user_format_input.lower().strip('.')
+    if target_ext not in format_map:
+        print(f"Unsupported format: {target_ext}")
+        return
+
+    target_format = format_map[target_ext]
+    pillow_format = "ICO" if target_format == "ico" else target_format.upper()
+
+    valid_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif', '.webp', '.ico']
+
+    files = []
+    for f in os.listdir(folder_path):
+        name, ext = os.path.splitext(f)
+        ext = ext.lower()
+        ext_clean = ext.strip('.')
+
+        # For tiff: treat tif and tiff as eligible
+        if target_format == "tiff" and ext_clean in ["tif", "tiff"]:
+            files.append(f)
+        elif ext_clean in format_map and format_map[ext_clean] != target_format:
+            files.append(f)
 
     if not files:
         print("No images to convert.")
         return
 
-    # Create output subfolder like converted/png
+    # Create output folder
     output_folder = os.path.join(folder_path, "converted", target_format)
     os.makedirs(output_folder, exist_ok=True)
 
@@ -49,7 +77,13 @@ def convert_images_in_folder(folder_path, target_format):
 
         try:
             with Image.open(input_path) as im:
-                im.save(output_path, target_format.upper())
+                if target_format == "ico":
+                    size = min(im.size)
+                    im = im.resize((size, size), Image.LANCZOS)
+                    im = im.resize((256, 256), Image.LANCZOS)
+                    im.save(output_path, format=pillow_format)
+                else:
+                    im.save(output_path, format=pillow_format)
         except Exception as e:
             print(f"\nFailed to convert {filename}: {e}")
 
@@ -60,5 +94,5 @@ if __name__ == "__main__":
         print("Invalid folder path.")
         sys.exit(1)
 
-    fmt = input("Enter desired image format (e.g., png, jpeg, webp, tiff): ").lower()
+    fmt = input("Enter desired image format (e.g., png, jpeg, webp, ico, tiff, tif): ").lower()
     convert_images_in_folder(folder, fmt)
